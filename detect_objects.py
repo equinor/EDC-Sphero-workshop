@@ -2,17 +2,16 @@ import cv2
 import numpy as np
 
 def make_contours(frame):
-    # Convert the frame to grayscale
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    # Apply Gaussian blur to reduce noise
     gray = cv2.GaussianBlur(gray, (9, 9), 2)
 
     # Perform edge detection using Canny
     edges = cv2.Canny(gray, 1500, 2500, apertureSize=5)
+    kernel = np.ones((3, 3), np.uint8)
+    edges = cv2.dilate(edges, kernel, iterations=1)
     cv2.imshow('Edges', edges)
 
-    # Find contours in the edge-detected image
     contours, _ = cv2.findContours(
         edges,
         cv2.RETR_EXTERNAL,
@@ -22,19 +21,18 @@ def make_contours(frame):
     return contours
 
 
-def detect_postits(contours):
-    """ Detects post-its in the frame and returns their centers. """
+def detect_objects(contours):
+    """ Detects objects in the frame and returns their centers and contours. """
 
     centers = []
+    position_contours = []
 
     for contour in contours:
-        # Include only contours with aspect ratio between 0.8 and 1.2
         x, y, w, h = cv2.boundingRect(contour)
         aspect_ratio = w / float(h)
-        if aspect_ratio < 0.7 or aspect_ratio > 1.3:
+        if aspect_ratio < 0.6 or aspect_ratio > 1.4:
             continue
 
-        # Calculate the moments of the contour
         M = cv2.moments(contour)
 
         # Calculate the center of mass (centroid) of the contour
@@ -44,13 +42,11 @@ def detect_postits(contours):
         else:
             cx, cy = 0, 0
 
-        # Draw a circle at the center of the object
-        cv2.circle(frame, (cx, cy), 5, (0, 0, 255), -1)  # Red color, filled circle
-
         # Store the center coordinates in the list
         centers.append((cx, cy))
+        position_contours.append(contour)
 
-    return centers
+    return centers, position_contours
 
 
 # Open the video stream (0 for default camera)
@@ -65,14 +61,17 @@ while True:
         break
 
     contours = make_contours(frame)
-    postits = detect_postits(contours)
+    centers, contours = detect_objects(contours)
 
-    for point in postits:
+    for point in centers:
         point = (int(point[0]), int(point[1]))
         cv2.circle(frame, point, 4, (0, 255, 0), -1)
 
+    for contour in contours:
+        cv2.drawContours(frame, [contour], -1, (0, 255, 0), 2)
+
     # Display the frame with detected squares
-    cv2.imshow('Squares Detected', frame)
+    cv2.imshow('Postits Detected', frame)
 
     # Exit when 'q' is pressed
     if cv2.waitKey(1) & 0xFF == ord('q'):
